@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import streamlit as st
 from streamlit_tags import st_tags_sidebar
 import pandas as pd
@@ -44,9 +42,11 @@ with st.sidebar.expander("API Keys", expanded=False):
     st.session_state['openai_api_key'] = st.text_input("OpenAI API Key", type="password")
     st.session_state['gemini_api_key'] = st.text_input("Gemini API Key", type="password")
     st.session_state['groq_api_key'] = st.text_input("Groq API Key", type="password")
+    st.session_state['ollama_url'] = st.text_input("Ollama API URL", value="https://a38b-82-65-236-238.ngrok-free.app", help="Enter your ngrok URL for Ollama API")
 
 # Model selection
-model_selection = st.sidebar.selectbox("Select Model", options=list(PRICING.keys()), index=0)
+model_options = ["Ollama"] + [k for k in PRICING.keys() if k != "Ollama"]  # Put Ollama first
+model_selection = st.sidebar.selectbox("Select Model", options=model_options, index=0)
 
 # URL input
 url_input = st.sidebar.text_input("Enter URL(s) separated by whitespace")
@@ -91,8 +91,6 @@ else:
     st.sidebar.info("Pagination and Attended Mode are disabled when multiple URLs are entered.")
 
 st.sidebar.markdown("---")
-
-
 
 # Main action button
 if st.sidebar.button("LAUNCH SCRAPER", type="primary"):
@@ -236,6 +234,7 @@ elif st.session_state['scraping_state'] == 'scraping':
             'pagination_info': pagination_info
         }
         st.session_state['scraping_state'] = 'completed'
+
 # Display results
 if st.session_state['scraping_state'] == 'completed' and st.session_state['results']:
     results = st.session_state['results']
@@ -252,29 +251,39 @@ if st.session_state['scraping_state'] == 'completed' and st.session_state['resul
         for i, data in enumerate(all_data, start=1):
             st.write(f"Data from URL {i}:")
             
-            # Handle string data (convert to dict if it's JSON)
-            if isinstance(data, str):
-                try:
+            try:
+                # Convert data to DataFrame
+                if isinstance(data, str):
                     data = json.loads(data)
-                except json.JSONDecodeError:
-                    st.error(f"Failed to parse data as JSON for URL {i}")
-                    continue
-            
-            if isinstance(data, dict):
-                if 'listings' in data and isinstance(data['listings'], list):
-                    df = pd.DataFrame(data['listings'])
+                
+                if isinstance(data, dict):
+                    if 'listings' in data and isinstance(data['listings'], list):
+                        df = pd.DataFrame(data['listings'])
+                    elif isinstance(data.get('listings'), dict):
+                        df = pd.DataFrame([data['listings']])
+                    else:
+                        df = pd.DataFrame([data])
+                elif hasattr(data, 'listings') and isinstance(data.listings, list):
+                    listings = [item.dict() for item in data.listings]
+                    df = pd.DataFrame(listings)
+                elif isinstance(data, list):
+                    df = pd.DataFrame(data)
                 else:
-                    # If 'listings' is not in the dict or not a list, use the entire dict
-                    df = pd.DataFrame([data])
-            elif hasattr(data, 'listings') and isinstance(data.listings, list):
-                # Handle the case where data is a Pydantic model
-                listings = [item.dict() for item in data.listings]
-                df = pd.DataFrame(listings)
-            else:
-                st.error(f"Unexpected data format for URL {i}")
-                continue
-            # Display the dataframe
-            st.dataframe(df, use_container_width=True)
+                    df = pd.DataFrame([{"error": "Failed to parse data"}])
+                
+                # Display the dataframe
+                if not df.empty:
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.warning(f"No data found for URL {i}")
+                
+                # Display raw data for debugging
+                with st.expander("Show raw data"):
+                    st.json(data)
+                    
+            except Exception as e:
+                st.error(f"Error displaying data for URL {i}: {str(e)}")
+                st.json(data)  # Show raw data when there's an error
 
         # Display token usage and cost
         st.sidebar.markdown("---")
@@ -333,7 +342,6 @@ if st.session_state['scraping_state'] == 'completed' and st.session_state['resul
         st.sidebar.markdown(f"*Output Tokens:* {pagination_info['token_counts']['output_tokens']}")
         st.sidebar.markdown(f"**Pagination Cost:** :blue-background[**${pagination_info['price']:.4f}**]")
 
-
         # Display page URLs in a table
         st.write("**Page URLs:**")
         # Make URLs clickable
@@ -368,6 +376,7 @@ if st.session_state['scraping_state'] == 'completed' and st.session_state['resul
         st.markdown(f"**Total Input Tokens:** {total_input_tokens_combined}")
         st.markdown(f"**Total Output Tokens:** {total_output_tokens_combined}")
         st.markdown(f"**Total Combined Cost:** :rainbow-background[**${total_combined_cost:.4f}**]")
+
 # Helper function to generate unique folder names
 def generate_unique_folder_name(url):
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')

@@ -77,14 +77,17 @@ PRICING = {
         "output": 0.30 / 1_000_000, # $0.30 per 1M output tokens
     },
     "Llama3.1 8B": {
-        "input": 0 ,  # Free
-        "output": 0 , # Free
+        "input": 0,  # Free
+        "output": 0, # Free
     },
     "Groq Llama3.1 70b": {
-        "input": 0 ,  # Free
-        "output": 0 , # Free
+        "input": 0,  # Free
+        "output": 0, # Free
     },
-    # Add other models and their prices here if needed
+    "Ollama": {
+        "input": 0,  # Free
+        "output": 0, # Free
+    }
 }
 
 # Timeout settings for web scraping
@@ -107,12 +110,29 @@ NUMBER_SCROLL=2
 
 LLAMA_MODEL_FULLNAME="lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF"
 GROQ_LLAMA_MODEL_FULLNAME="llama-3.1-70b-versatile"
+OLLAMA_MODEL_NAME="llama3.1:8b"
 
-SYSTEM_MESSAGE = """You are an intelligent text extraction and conversion assistant. Your task is to extract structured information 
-                        from the given text and convert it into a pure JSON format. The JSON should contain only the structured data extracted from the text, 
-                        with no additional commentary, explanations, or extraneous information. 
-                        You could encounter cases where you can't find the data of the fields you have to extract or the data will be in a foreign language.
-                        Please process the following text and provide the output in pure JSON format with no words before or after the JSON:"""
+SYSTEM_MESSAGE = """You are an intelligent text extraction and conversion assistant specialized in extracting structured data from HTML/text content. Your task is to extract specific fields from the provided text and format them as JSON.
+
+The output must be ONLY valid JSON with no additional text. Follow this exact structure:
+{
+    "listings": [
+        {
+            "title": "Product name/title",
+            "price": "Price value",
+            "status": "Stock status"
+        },
+        // More listings as needed
+    ]
+}
+
+Rules:
+1. Extract ALL product listings found in the text
+2. Include all three required fields for each listing
+3. If a field value is not found, use an empty string ("")
+4. Do not include any explanations or additional text
+5. Ensure the response is properly formatted JSON
+6. Remove any currency symbols or special characters from price values"""
 
 USER_MESSAGE = f"Extract the following information from the provided text:\nPage content:\n\n"
         
