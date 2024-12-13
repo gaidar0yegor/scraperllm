@@ -16,9 +16,9 @@ def scrape_url(url, attended_mode=False, driver=None):
     raw_html = fetch_html_selenium(url, attended_mode=attended_mode, driver=driver)
     return html_to_markdown_with_readability(raw_html)
 
-def scrape_with_pagination(initial_url, model_selection, fields, output_folder, pagination_details=""):
+def scrape_with_pagination(initial_url, model_selection, fields, output_folder, pagination_details="", driver=None, credentials=None, cookie_selectors=None):
     """
-    Scrape multiple pages starting from the initial URL.
+    Scrape multiple pages starting from the initial URL, maintaining browser session.
     
     Args:
         initial_url (str): The starting URL to scrape
@@ -26,6 +26,9 @@ def scrape_with_pagination(initial_url, model_selection, fields, output_folder, 
         fields (list): Fields to extract from each page
         output_folder (str): Where to save the results
         pagination_details (str): Optional hints about pagination structure
+        driver (selenium.webdriver): Optional existing browser session
+        credentials (dict): Optional login credentials
+        cookie_selectors (list): Optional cookie consent selectors
     
     Returns:
         tuple: (all_data, total_tokens, total_cost)
@@ -41,8 +44,11 @@ def scrape_with_pagination(initial_url, model_selection, fields, output_folder, 
     DynamicListingModel = create_dynamic_listing_model(fields)
     DynamicListingsContainer = create_listings_container_model(DynamicListingModel)
     
-    # Setup driver for consistent session
-    driver = setup_selenium(attended_mode=False)
+    # Use existing driver or create new one
+    should_quit_driver = False
+    if driver is None:
+        driver = setup_selenium(attended_mode=False)
+        should_quit_driver = True
     
     try:
         # Process initial page
@@ -54,8 +60,22 @@ def scrape_with_pagination(initial_url, model_selection, fields, output_folder, 
                 # Mark URL as processed
                 processed_urls.add(current_url)
                 
-                # Scrape current page
-                markdown = scrape_url(current_url, driver=driver)
+                # Navigate to the URL using the same driver
+                if page_num == 1:
+                    # First page: handle login and cookies
+                    raw_html = fetch_html_selenium(
+                        current_url,
+                        driver=driver,
+                        cookie_selectors=cookie_selectors,
+                        credentials=credentials
+                    )
+                else:
+                    # Subsequent pages: just navigate and get content
+                    driver.get(current_url)
+                    time.sleep(2)  # Wait for page load
+                    raw_html = driver.page_source
+                
+                markdown = html_to_markdown_with_readability(raw_html)
                 save_raw_data(markdown, output_folder, f'rawData_{page_num}.md')
                 
                 # Format and save data
@@ -110,7 +130,8 @@ def scrape_with_pagination(initial_url, model_selection, fields, output_folder, 
                 current_url = None  # Stop on error
                 
     finally:
-        if driver:
+        # Only quit the driver if we created it
+        if should_quit_driver and driver:
             driver.quit()
     
     return all_data, {
