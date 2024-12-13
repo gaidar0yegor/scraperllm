@@ -102,18 +102,15 @@ def handle_ollama(data, DynamicListingModel):
     print("DEBUG: Entering Ollama branch in format_data function")
     sys_message = generate_system_message(DynamicListingModel)
     
-    # Get the Ollama API URL from session state, fallback to default if not set
-    ollama_url = st.session_state.get('ollama_url', 'http://localhost:11434')
+    # Get the Ollama API URL from session state
+    ollama_url = st.session_state.get('ollama_url', '').strip()
     
-    # Display which Ollama instance we're using
-    if ollama_url == 'http://localhost:11434':
-        print("WARNING: Using local Ollama instance")
-        st.warning("Using local Ollama instance. To use external Ollama, set the API URL in the settings.")
-    else:
-        print(f"INFO: Using external Ollama instance at {ollama_url}")
-        st.info(f"Using external Ollama instance at {ollama_url}")
+    # Try local Ollama if no URL provided
+    if not ollama_url:
+        print("DEBUG: No Ollama URL provided, trying local instance")
+        ollama_url = 'http://localhost:11434'
     
-    print(f"DEBUG: System message: {sys_message}")
+    print(f"DEBUG: Attempting to use Ollama at {ollama_url}")
     
     prompt = f"""Extract product information from the text and format it as JSON. Each product has three pieces of information marked with specific prefixes:
 
@@ -174,7 +171,8 @@ Here's the text to process:
                 "stream": False,
                 "temperature": 0.1,
                 "top_p": 0.95
-            }
+            },
+            timeout=10  # Add timeout to fail fast if server is unreachable
         )
         print(f"DEBUG: Ollama API response status code: {response.status_code}")
         
@@ -259,6 +257,17 @@ Here's the text to process:
         else:
             print(f"DEBUG: Ollama API request failed with status code: {response.status_code}")
             raise Exception(f"Ollama API request failed with status code: {response.status_code}")
+    except requests.exceptions.ConnectionError:
+        print("DEBUG: Could not connect to Ollama API")
+        if ollama_url == 'http://localhost:11434':
+            st.error("No local Ollama instance found. Please install and run Ollama locally, or provide an external Ollama API URL.")
+        else:
+            st.error(f"Could not connect to Ollama at {ollama_url}. Please check the URL and try again.")
+        raise
+    except requests.exceptions.Timeout:
+        print("DEBUG: Ollama API request timed out")
+        st.error("Ollama API request timed out. Please check your connection or try again.")
+        raise
     except Exception as e:
         print(f"DEBUG: An error occurred while processing Ollama request: {str(e)}")
         # Use regex as a fallback when API call fails

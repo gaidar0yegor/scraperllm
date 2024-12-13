@@ -42,7 +42,11 @@ with st.sidebar.expander("API Keys", expanded=False):
     st.session_state['openai_api_key'] = st.text_input("OpenAI API Key", type="password")
     st.session_state['gemini_api_key'] = st.text_input("Gemini API Key", type="password")
     st.session_state['groq_api_key'] = st.text_input("Groq API Key", type="password")
-    st.session_state['ollama_url'] = st.text_input("Ollama API URL", value="https://a38b-82-65-236-238.ngrok-free.app", help="Enter your ngrok URL for Ollama API")
+    st.session_state['ollama_url'] = st.text_input(
+        "Ollama API URL (optional)", 
+        value="",
+        help="Leave empty to use local Ollama instance, or enter external Ollama API URL"
+    )
 
 # Model selection
 model_options = ["Ollama"] + [k for k in PRICING.keys() if k != "Ollama"]  # Put Ollama first
