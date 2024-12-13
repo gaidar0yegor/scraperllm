@@ -107,9 +107,14 @@ def render_authentication_section():
                 }
                 
                 # Show debug information
-                with st.expander("Debug Information"):
-                    st.json(credentials)
+                st.markdown("### Debug Information")
+                st.code(str(credentials), language="python")
+                print("Credentials created:", credentials)  # Debug print
             else:
                 st.error("Please fill in all required fields for authentication")
+                print("Missing required fields for credentials")  # Debug print
+        else:
+            print("Authentication not enabled")  # Debug print
         
+        print("Returning use_auth:", use_auth, "credentials:", credentials)  # Debug print
         return use_auth, credentials
