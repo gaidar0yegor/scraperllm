@@ -8,44 +8,46 @@ def render_authentication_section():
         
         if use_auth:
             # Login URL input
-            st.session_state['login_url'] = st.text_input(
+            login_url = st.text_input(
                 "Login Page URL",
-                value="https://sigest.services/login",
+                value=st.session_state.get('login_url', 'https://sigest.services/login'),
                 help="The URL of the login page"
             )
+            st.session_state['login_url'] = login_url
             
             # Username/Email input
-            st.session_state['username'] = st.text_input("Username/Email")
-            if not st.session_state['username']:
+            username = st.text_input(
+                "Username/Email",
+                value=st.session_state.get('username', ''),
+                help="Enter your username or email"
+            )
+            st.session_state['username'] = username
+            if not username:
                 st.warning("Please enter your username/email")
             
             # Password input
-            st.session_state['password'] = st.text_input("Password", type="password")
-            if not st.session_state['password']:
+            password = st.text_input(
+                "Password",
+                type="password",
+                value=st.session_state.get('password', ''),
+                help="Enter your password"
+            )
+            st.session_state['password'] = password
+            if not password:
                 st.warning("Please enter your password")
             
             # Selectors for login form
             st.markdown("### Login Form Selectors")
             st.info("""
-            Common selector examples:
-            - ID: 'email', 'username', 'password'
-            - Class: 'form-control', 'login-input'
-            - XPath: '//button[@type="submit"]', '//input[@name="email"]'
+            The login form uses the following fields:
+            - Username field: id="email"
+            - Password field: id="password"
+            - Submit button: button[type='submit'] with class 'btn-dark'
             """)
             
             # Username field selector
-            username_selector_type = st.selectbox(
-                "Username Field Selector Type", 
-                ["id", "class", "xpath"],
-                index=0  # Default to 'id'
-            )
-            username_selector_value = st.text_input(
-                "Username Field Selector",
-                value="email" if username_selector_type == "id" else "",
-                help="Example: 'email' for ID, 'form-control' for class"
-            )
-            if not username_selector_value:
-                st.warning("Please enter the username field selector")
+            username_selector_type = "id"  # Fixed to use ID selector
+            username_selector_value = "email"  # Fixed value from the form
             
             st.session_state['username_field'] = {
                 "type": username_selector_type,
@@ -53,18 +55,8 @@ def render_authentication_section():
             }
             
             # Password field selector
-            password_selector_type = st.selectbox(
-                "Password Field Selector Type", 
-                ["id", "class", "xpath"],
-                index=0  # Default to 'id'
-            )
-            password_selector_value = st.text_input(
-                "Password Field Selector",
-                value="password" if password_selector_type == "id" else "",
-                help="Example: 'password' for ID, 'form-control' for class"
-            )
-            if not password_selector_value:
-                st.warning("Please enter the password field selector")
+            password_selector_type = "id"  # Fixed to use ID selector
+            password_selector_value = "password"  # Fixed value from the form
             
             st.session_state['password_field'] = {
                 "type": password_selector_type,
@@ -72,49 +64,38 @@ def render_authentication_section():
             }
             
             # Submit button selector
-            submit_selector_type = st.selectbox(
-                "Submit Button Selector Type", 
-                ["id", "class", "xpath"],
-                index=2  # Default to 'xpath'
-            )
-            submit_selector_value = st.text_input(
-                "Submit Button Selector",
-                value="//button[@type='submit']" if submit_selector_type == "xpath" else "",
-                help="Example: '//button[@type=\"submit\"]' for XPath"
-            )
-            if not submit_selector_value:
-                st.warning("Please enter the submit button selector")
+            submit_selector_type = "xpath"  # Fixed to use xpath selector
+            submit_selector_value = "//button[@type='submit' and contains(@class, 'btn-dark')]"  # Fixed value from the form
             
             st.session_state['submit_button'] = {
                 "type": submit_selector_type,
                 "value": submit_selector_value
             }
             
-            # Create credentials dictionary only if all required fields are filled
-            if (st.session_state['username'] and 
-                st.session_state['password'] and 
-                username_selector_value and 
-                password_selector_value and 
-                submit_selector_value):
-                
+            # Create credentials dictionary if username and password are provided
+            if username and password:
                 credentials = {
-                    "login_url": st.session_state['login_url'],
+                    "login_url": login_url,
                     "username_field": st.session_state['username_field'],
                     "password_field": st.session_state['password_field'],
                     "submit_button": st.session_state['submit_button'],
-                    "username": st.session_state['username'],
-                    "password": st.session_state['password']
+                    "username": username,
+                    "password": password
                 }
                 
                 # Show debug information
-                st.markdown("### Debug Information")
-                st.code(str(credentials), language="python")
-                print("Credentials created:", credentials)  # Debug print
+                st.markdown("### Current Credentials")
+                st.code(f"""
+Login URL: {login_url}
+Username: {username}
+Username Field: id="{username_selector_value}"
+Password Field: id="{password_selector_value}"
+Submit Button: xpath="{submit_selector_value}"
+""", language="text")
             else:
-                st.error("Please fill in all required fields for authentication")
-                print("Missing required fields for credentials")  # Debug print
+                st.error("Please enter your username and password")
         else:
-            print("Authentication not enabled")  # Debug print
+            # Clear credentials if authentication is disabled
+            st.session_state['credentials'] = None
         
-        print("Returning use_auth:", use_auth, "credentials:", credentials)  # Debug print
         return use_auth, credentials
