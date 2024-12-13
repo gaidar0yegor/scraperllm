@@ -52,11 +52,12 @@ def handle_scraping(settings, credentials=None, cookie_selectors=None):
             all_data.extend(results['data'])
             pagination_info = results.get('pagination_info')
 
-        finally:
-            # Only close the driver in attended mode when explicitly requested
+        except Exception as e:
+            st.error(f"Error during scraping: {str(e)}")
             if driver and not settings['attended_mode']:
                 driver.quit()
                 st.session_state['driver'] = None
+            raise
 
         # Return results
         return {
@@ -143,6 +144,7 @@ def handle_unattended_mode_scraping(settings, credentials, cookie_selectors, out
 
     # Create a single driver for all URLs
     driver = setup_selenium(attended_mode=False)
+    st.session_state['driver'] = driver  # Store driver in session state
     
     try:
         for i, url in enumerate(settings['urls'], start=1):
@@ -197,11 +199,14 @@ def handle_unattended_mode_scraping(settings, credentials, cookie_selectors, out
                 results['output_tokens'] += data_results['output_tokens']
                 results['cost'] += data_results['cost']
                 results['data'].extend(data_results['data'])
-    finally:
-        if driver:
-            driver.quit()
 
-    return results
+        return results
+    except Exception as e:
+        st.error(f"Error during unattended scraping: {str(e)}")
+        raise
+    finally:
+        # Don't quit the driver here - let the caller handle it
+        pass
 
 def process_page_data(markdown, fields, model_selection, output_folder, index):
     """Process data from a single page."""

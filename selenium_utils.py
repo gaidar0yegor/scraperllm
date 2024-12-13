@@ -122,6 +122,46 @@ def handle_cookies(driver, cookie_selectors=None):
     
     return False
 
+def verify_login_success(driver, timeout=10):
+    """Verify that login was successful by checking for common indicators."""
+    try:
+        # Wait for URL change
+        start_time = time.time()
+        while "login" in driver.current_url.lower():
+            if time.time() - start_time > timeout:
+                print("Timeout waiting for URL change after login")
+                return False
+            time.sleep(0.5)
+        
+        # Additional checks for successful login
+        success_indicators = [
+            (By.CLASS_NAME, "user-info"),
+            (By.CLASS_NAME, "account"),
+            (By.CLASS_NAME, "logout"),
+            (By.XPATH, "//a[contains(@href, 'logout')]"),
+            (By.XPATH, "//a[contains(@href, 'account')]")
+        ]
+        
+        for selector in success_indicators:
+            try:
+                WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located(selector)
+                )
+                print(f"Found login success indicator: {selector}")
+                return True
+            except TimeoutException:
+                continue
+        
+        # If we're not on login page anymore, consider it a success
+        if "login" not in driver.current_url.lower():
+            print("Login appears successful - no longer on login page")
+            return True
+            
+        return False
+    except Exception as e:
+        print(f"Error verifying login: {str(e)}")
+        return False
+
 def handle_login(driver, credentials):
     """
     Try to log in using provided credentials.
@@ -135,7 +175,7 @@ def handle_login(driver, credentials):
         login_url = credentials.get('login_url', 'https://sigest.services/login')
         print(f"Navigating to login page: {login_url}")
         driver.get(login_url)
-        time.sleep(2)  # Wait for page load
+        time.sleep(3)  # Wait for page load
         
         print("Looking for username field...")
         # Find username field
@@ -177,8 +217,10 @@ def handle_login(driver, credentials):
         print("Entering credentials...")
         username_element.clear()  # Clear any existing text
         username_element.send_keys(credentials["username"])
+        time.sleep(1)  # Small delay between fields
         password_element.clear()  # Clear any existing text
         password_element.send_keys(credentials["password"])
+        time.sleep(1)  # Small delay before clicking submit
 
         print("Looking for submit button...")
         # Find and click submit button
@@ -200,14 +242,15 @@ def handle_login(driver, credentials):
 
         print("Clicking submit button...")
         submit_element.click()
-        time.sleep(3)  # Wait for login to complete
+        time.sleep(5)  # Wait for login to complete
         
-        # Check if login was successful
-        if "login" not in driver.current_url.lower():
-            print("Login successful - redirected away from login page")
+        # Verify login success
+        if verify_login_success(driver):
+            print("Login verification successful")
+            time.sleep(3)  # Additional wait after successful login
             return True
         else:
-            print("Login may have failed - still on login page")
+            print("Login verification failed")
             return False
 
     except (TimeoutException, NoSuchElementException) as e:
@@ -230,11 +273,12 @@ def fetch_html_selenium(url, attended_mode=False, driver=None, cookie_selectors=
                         driver.quit()
                     return None
                 print("Login successful, waiting before proceeding...")
-                time.sleep(2)  # Wait after login
+                time.sleep(3)  # Wait after login
             
             # Navigate to target URL
             print(f"Navigating to target URL: {url}")
             driver.get(url)
+            time.sleep(3)  # Wait for page load
             
             # Handle cookies
             handle_cookies(driver, cookie_selectors)
@@ -243,6 +287,7 @@ def fetch_html_selenium(url, attended_mode=False, driver=None, cookie_selectors=
         if not attended_mode:
             print(f"Using existing driver to navigate to: {url}")
             driver.get(url)
+            time.sleep(3)  # Wait for page load
             handle_cookies(driver, cookie_selectors)
 
     try:
