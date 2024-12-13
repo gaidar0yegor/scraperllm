@@ -169,73 +169,171 @@ def handle_login(driver, credentials):
         driver.get(login_url)
         time.sleep(3)  # Wait for page load
         
+        # Debug print current page source
+        print("Current page source:")
+        print(driver.page_source[:500])  # Print first 500 chars
+        
         print("Looking for username field...")  # Debug print
-        # Find username field
-        if credentials["username_field"]["type"] == "id":
-            username_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, credentials["username_field"]["value"]))
+        # Find username field using multiple methods
+        username_element = None
+        try:
+            # Try by ID first
+            username_element = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "email"))
             )
-            print(f"Found username field by ID: {credentials['username_field']['value']}")  # Debug print
-        elif credentials["username_field"]["type"] == "class":
-            username_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, credentials["username_field"]["value"]))
-            )
-            print(f"Found username field by class: {credentials['username_field']['value']}")  # Debug print
-        elif credentials["username_field"]["type"] == "xpath":
-            username_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, credentials["username_field"]["value"]))
-            )
-            print(f"Found username field by XPath: {credentials['username_field']['value']}")  # Debug print
+            print("Found username field by ID 'email'")
+        except:
+            try:
+                # Try by name
+                username_element = WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.NAME, "email"))
+                )
+                print("Found username field by name 'email'")
+            except:
+                try:
+                    # Try by XPath
+                    username_element = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((By.XPATH, "//input[@type='email']"))
+                    )
+                    print("Found username field by XPath '//input[@type='email']'")
+                except:
+                    print("Could not find username field by common selectors")
+                    # Now try with provided selector
+                    if credentials["username_field"]["type"] == "id":
+                        username_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, credentials["username_field"]["value"]))
+                        )
+                    elif credentials["username_field"]["type"] == "class":
+                        username_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, credentials["username_field"]["value"]))
+                        )
+                    elif credentials["username_field"]["type"] == "xpath":
+                        username_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, credentials["username_field"]["value"]))
+                        )
+
+        if not username_element:
+            print("Failed to find username field")
+            return False
 
         print("Looking for password field...")  # Debug print
-        # Find password field
-        if credentials["password_field"]["type"] == "id":
-            password_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, credentials["password_field"]["value"]))
+        # Find password field using multiple methods
+        password_element = None
+        try:
+            # Try by ID first
+            password_element = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "password"))
             )
-            print(f"Found password field by ID: {credentials['password_field']['value']}")  # Debug print
-        elif credentials["password_field"]["type"] == "class":
-            password_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, credentials["password_field"]["value"]))
-            )
-            print(f"Found password field by class: {credentials['password_field']['value']}")  # Debug print
-        elif credentials["password_field"]["type"] == "xpath":
-            password_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, credentials["password_field"]["value"]))
-            )
-            print(f"Found password field by XPath: {credentials['password_field']['value']}")  # Debug print
+            print("Found password field by ID 'password'")
+        except:
+            try:
+                # Try by name
+                password_element = WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.NAME, "password"))
+                )
+                print("Found password field by name 'password'")
+            except:
+                try:
+                    # Try by XPath
+                    password_element = WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((By.XPATH, "//input[@type='password']"))
+                    )
+                    print("Found password field by XPath '//input[@type='password']'")
+                except:
+                    print("Could not find password field by common selectors")
+                    # Now try with provided selector
+                    if credentials["password_field"]["type"] == "id":
+                        password_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.ID, credentials["password_field"]["value"]))
+                        )
+                    elif credentials["password_field"]["type"] == "class":
+                        password_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, credentials["password_field"]["value"]))
+                        )
+                    elif credentials["password_field"]["type"] == "xpath":
+                        password_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, credentials["password_field"]["value"]))
+                        )
 
-        # Enter credentials
+        if not password_element:
+            print("Failed to find password field")
+            return False
+
+        # Enter credentials with explicit waits and checks
         print(f"Entering username: {credentials['username']}")  # Debug print
         username_element.clear()  # Clear any existing text
         username_element.send_keys(credentials["username"])
         time.sleep(1)  # Small delay between fields
         
+        # Verify username was entered
+        entered_username = username_element.get_attribute('value')
+        print(f"Entered username value: {entered_username}")
+        if entered_username != credentials["username"]:
+            print("Username was not entered correctly")
+            return False
+        
         print("Entering password...")  # Debug print
         password_element.clear()  # Clear any existing text
         password_element.send_keys(credentials["password"])
         time.sleep(1)  # Small delay before clicking submit
+        
+        # Verify password was entered (length check only for security)
+        entered_password = password_element.get_attribute('value')
+        print(f"Password field contains {len(entered_password)} characters")
+        if len(entered_password) != len(credentials["password"]):
+            print("Password was not entered correctly")
+            return False
 
         print("Looking for submit button...")  # Debug print
-        # Find and click submit button
-        if credentials["submit_button"]["type"] == "id":
-            submit_element = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, credentials["submit_button"]["value"]))
+        # Find submit button using multiple methods
+        submit_element = None
+        try:
+            # Try by type first
+            submit_element = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))
             )
-            print(f"Found submit button by ID: {credentials['submit_button']['value']}")  # Debug print
-        elif credentials["submit_button"]["type"] == "class":
-            submit_element = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.CLASS_NAME, credentials["submit_button"]["value"]))
-            )
-            print(f"Found submit button by class: {credentials['submit_button']['value']}")  # Debug print
-        elif credentials["submit_button"]["type"] == "xpath":
-            submit_element = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, credentials["submit_button"]["value"]))
-            )
-            print(f"Found submit button by XPath: {credentials['submit_button']['value']}")  # Debug print
+            print("Found submit button by type 'submit'")
+        except:
+            try:
+                # Try by common text
+                submit_element = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Login')]"))
+                )
+                print("Found submit button by text 'Login'")
+            except:
+                print("Could not find submit button by common selectors")
+                # Now try with provided selector
+                if credentials["submit_button"]["type"] == "id":
+                    submit_element = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.ID, credentials["submit_button"]["value"]))
+                    )
+                elif credentials["submit_button"]["type"] == "class":
+                    submit_element = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.CLASS_NAME, credentials["submit_button"]["value"]))
+                    )
+                elif credentials["submit_button"]["type"] == "xpath":
+                    submit_element = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, credentials["submit_button"]["value"]))
+                    )
+
+        if not submit_element:
+            print("Failed to find submit button")
+            return False
 
         print("Clicking submit button...")  # Debug print
-        submit_element.click()
+        # Try multiple click methods
+        try:
+            submit_element.click()
+        except:
+            try:
+                driver.execute_script("arguments[0].click();", submit_element)
+            except:
+                try:
+                    submit_element.submit()
+                except:
+                    print("All click methods failed")
+                    return False
+
         time.sleep(5)  # Wait for login to complete
         
         # Verify login success
