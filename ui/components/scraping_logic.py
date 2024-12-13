@@ -14,7 +14,8 @@ from scraper import (
     create_dynamic_listing_model,
     create_listings_container_model,
     setup_selenium,
-    generate_unique_folder_name
+    generate_unique_folder_name,
+    scrape_with_pagination
 )
 from pagination_detector import detect_pagination_elements
 
@@ -90,16 +91,34 @@ def handle_attended_mode_scraping(driver, settings, credentials, cookie_selector
 
     # Handle pagination if enabled
     if settings['use_pagination']:
-        pagination_results = handle_pagination(
+        # Use the new scrape_with_pagination function
+        data, token_counts = scrape_with_pagination(
+            current_url,
+            settings['model_selection'],
+            settings['fields'],
+            output_folder,
+            settings['pagination_details']
+        )
+        results['data'].extend(data)
+        results['input_tokens'] = token_counts['input_tokens']
+        results['output_tokens'] = token_counts['output_tokens']
+        results['cost'] = token_counts['total_cost']
+        
+        # Get pagination info for display
+        pagination_data, p_token_counts, p_cost = detect_pagination_elements(
             current_url,
             settings['pagination_details'],
             settings['model_selection'],
             markdown
         )
-        results['pagination_info'] = pagination_results
-
-    # Process data if scraping is enabled
-    if settings['show_tags']:
+        results['pagination_info'] = {
+            "page_urls": pagination_data.page_urls if hasattr(pagination_data, 'page_urls') 
+                        else pagination_data.get('page_urls', []),
+            "token_counts": p_token_counts,
+            "price": p_cost
+        }
+    else:
+        # Process single page
         data_results = process_page_data(
             markdown,
             settings['fields'],
@@ -121,28 +140,53 @@ def handle_unattended_mode_scraping(settings, credentials, cookie_selectors, out
     }
 
     for i, url in enumerate(settings['urls'], start=1):
-        # Fetch HTML
-        raw_html = fetch_html_selenium(
-            url,
-            attended_mode=False,
-            cookie_selectors=cookie_selectors,
-            credentials=credentials
-        )
-        markdown = html_to_markdown_with_readability(raw_html)
-        save_raw_data(markdown, output_folder, f'rawData_{i}.md')
-
-        # Handle pagination for first URL only
         if settings['use_pagination'] and i == 1:
-            pagination_results = handle_pagination(
+            # Use the new scrape_with_pagination function for the first URL
+            data, token_counts = scrape_with_pagination(
+                url,
+                settings['model_selection'],
+                settings['fields'],
+                output_folder,
+                settings['pagination_details']
+            )
+            results['data'].extend(data)
+            results['input_tokens'] += token_counts['input_tokens']
+            results['output_tokens'] += token_counts['output_tokens']
+            results['cost'] += token_counts['total_cost']
+            
+            # Get initial page content for pagination info
+            raw_html = fetch_html_selenium(
+                url,
+                attended_mode=False,
+                cookie_selectors=cookie_selectors,
+                credentials=credentials
+            )
+            markdown = html_to_markdown_with_readability(raw_html)
+            
+            # Get pagination info for display
+            pagination_data, p_token_counts, p_cost = detect_pagination_elements(
                 url,
                 settings['pagination_details'],
                 settings['model_selection'],
                 markdown
             )
-            results['pagination_info'] = pagination_results
-
-        # Process data if scraping is enabled
-        if settings['show_tags']:
+            results['pagination_info'] = {
+                "page_urls": pagination_data.page_urls if hasattr(pagination_data, 'page_urls') 
+                            else pagination_data.get('page_urls', []),
+                "token_counts": p_token_counts,
+                "price": p_cost
+            }
+        else:
+            # Process single page for additional URLs
+            raw_html = fetch_html_selenium(
+                url,
+                attended_mode=False,
+                cookie_selectors=cookie_selectors,
+                credentials=credentials
+            )
+            markdown = html_to_markdown_with_readability(raw_html)
+            save_raw_data(markdown, output_folder, f'rawData_{i}.md')
+            
             data_results = process_page_data(
                 markdown,
                 settings['fields'],
@@ -156,24 +200,6 @@ def handle_unattended_mode_scraping(settings, credentials, cookie_selectors, out
             results['data'].extend(data_results['data'])
 
     return results
-
-def handle_pagination(url, pagination_details, model_selection, markdown):
-    """Handle pagination detection and processing."""
-    pagination_data, token_counts, pagination_price = detect_pagination_elements(
-        url, pagination_details, model_selection, markdown
-    )
-    
-    # Extract page URLs
-    if isinstance(pagination_data, dict):
-        page_urls = pagination_data.get("page_urls", [])
-    else:
-        page_urls = pagination_data.page_urls
-    
-    return {
-        "page_urls": page_urls,
-        "token_counts": token_counts,
-        "price": pagination_price
-    }
 
 def process_page_data(markdown, fields, model_selection, output_folder, index):
     """Process data from a single page."""
