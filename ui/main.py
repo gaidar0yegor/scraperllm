@@ -33,11 +33,25 @@ def main():
     use_cookie_handling, cookie_selectors = render_cookie_handling_section()
     settings = render_scraping_settings()
 
+    # Store credentials in session state if authentication is enabled
+    if use_auth and credentials:
+        st.session_state['credentials'] = credentials
+    else:
+        st.session_state['credentials'] = None
+
+    # Store cookie selectors in session state
+    if use_cookie_handling and cookie_selectors:
+        st.session_state['cookie_selectors'] = cookie_selectors
+    else:
+        st.session_state['cookie_selectors'] = None
+
     # Main action button
     if st.sidebar.button("LAUNCH SCRAPER", type="primary"):
         if not settings['is_valid']:
             st.error(settings['error_message'])
         else:
+            # Store settings in session state
+            st.session_state['settings'] = settings
             st.session_state['scraping_state'] = 'waiting' if settings['attended_mode'] else 'scraping'
             st.rerun()
 
@@ -46,13 +60,26 @@ def main():
         # Attended mode: set up driver and wait for user interaction
         if st.session_state['driver'] is None:
             st.session_state['driver'] = setup_selenium(attended_mode=True)
+            
+            # First handle login if enabled
+            if st.session_state.get('credentials'):
+                st.write("Attempting to log in...")
+                login_success = handle_login(st.session_state['driver'], st.session_state['credentials'])
+                if login_success:
+                    st.success("Login successful!")
+                else:
+                    st.error("Login failed. Please check your credentials.")
+                    st.session_state['driver'].quit()
+                    st.session_state['driver'] = None
+                    st.session_state['scraping_state'] = 'idle'
+                    st.rerun()
+            
+            # Then navigate to the target URL
             st.session_state['driver'].get(settings['urls'][0])
             
-            # Handle cookies and login if enabled
-            if cookie_selectors:
-                handle_cookies(st.session_state['driver'], cookie_selectors)
-            if credentials:
-                handle_login(st.session_state['driver'], credentials)
+            # Handle cookies if enabled
+            if st.session_state.get('cookie_selectors'):
+                handle_cookies(st.session_state['driver'], st.session_state['cookie_selectors'])
             
             st.write("Perform any required actions in the browser window that opened.")
             st.write("Navigate to the page you want to scrape.")
@@ -66,14 +93,21 @@ def main():
 
     elif st.session_state['scraping_state'] == 'scraping':
         # Perform scraping
-        results = handle_scraping(
-            settings,
-            credentials if use_auth else None,
-            cookie_selectors if use_cookie_handling else None
-        )
-        st.session_state['results'] = results
-        st.session_state['scraping_state'] = 'completed'
-        st.rerun()
+        try:
+            results = handle_scraping(
+                settings,
+                st.session_state.get('credentials'),  # Use credentials from session state
+                st.session_state.get('cookie_selectors')  # Use cookie selectors from session state
+            )
+            st.session_state['results'] = results
+            st.session_state['scraping_state'] = 'completed'
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error during scraping: {str(e)}")
+            if st.session_state.get('driver'):
+                st.session_state['driver'].quit()
+                st.session_state['driver'] = None
+            st.session_state['scraping_state'] = 'idle'
 
     # Display results if available
     if st.session_state['scraping_state'] == 'completed' and st.session_state['results']:
@@ -81,6 +115,12 @@ def main():
         
         # Reset scraping state button
         if st.sidebar.button("Clear Results"):
+            # Clean up
+            if st.session_state.get('driver'):
+                st.session_state['driver'].quit()
+                st.session_state['driver'] = None
             st.session_state['scraping_state'] = 'idle'
             st.session_state['results'] = None
+            st.session_state['credentials'] = None
+            st.session_state['cookie_selectors'] = None
             st.rerun()
