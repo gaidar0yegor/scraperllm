@@ -143,28 +143,9 @@ def verify_login_success(driver, timeout=10):
                 return False
             time.sleep(0.5)
         
-        # Additional checks for successful login
-        success_indicators = [
-            (By.CLASS_NAME, "user-info"),
-            (By.CLASS_NAME, "account"),
-            (By.CLASS_NAME, "logout"),
-            (By.XPATH, "//a[contains(@href, 'logout')]"),
-            (By.XPATH, "//a[contains(@href, 'account')]")
-        ]
-        
-        for selector in success_indicators:
-            try:
-                WebDriverWait(driver, 3).until(
-                    EC.presence_of_element_located(selector)
-                )
-                print(f"Found login success indicator: {selector}")  # Debug print
-                return True
-            except TimeoutException:
-                continue
-        
-        # If we're not on login page anymore, consider it a success
-        if "login" not in driver.current_url.lower():
-            print("Login appears successful - no longer on login page")  # Debug print
+        # Check if we're redirected to the expected URL
+        if "weboutilmag.sigest.services" in driver.current_url:
+            print("Successfully redirected to weboutilmag.sigest.services")  # Debug print
             return True
             
         print("No login success indicators found")  # Debug print
@@ -260,7 +241,11 @@ def handle_login(driver, credentials):
         # Verify login success
         if verify_login_success(driver):
             print("Login verification successful")  # Debug print
-            time.sleep(3)  # Additional wait after successful login
+            # After successful login, navigate to the target URL
+            target_url = "https://weboutilmag.sigest.services/shop-product-prices/management"
+            print(f"Navigating to target URL: {target_url}")  # Debug print
+            driver.get(target_url)
+            time.sleep(3)  # Additional wait after navigation
             return True
         else:
             print("Login verification failed")  # Debug print
@@ -289,11 +274,11 @@ def fetch_html_selenium(url, attended_mode=False, driver=None, cookie_selectors=
                     return None
                 print("Login successful, waiting before proceeding...")  # Debug print
                 time.sleep(3)  # Wait after login
-            
-            # Navigate to target URL
-            print(f"Navigating to target URL: {url}")  # Debug print
-            driver.get(url)
-            time.sleep(3)  # Wait for page load
+            else:
+                # If no credentials, just navigate to the URL
+                print(f"No credentials provided, navigating directly to: {url}")  # Debug print
+                driver.get(url)
+                time.sleep(3)  # Wait for page load
             
             # Handle cookies
             handle_cookies(driver, cookie_selectors)
